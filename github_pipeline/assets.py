@@ -22,7 +22,7 @@ from .utils import create_markdown_report, extract_metadata
 )
 def delta_rs_metadata(context: AssetExecutionContext, github_api: GitHubAPIResource) -> dict[str, Any]:
     """Metadata from the GitHub repository of the Delta Lake Python client."""
-    repo_metadata = github_api.get_repository(owner='delta-io', repo='delta-rs')
+    repo_metadata = github_api.get_metadata(owner='delta-io', repo='delta-rs')
 
     context.add_output_metadata(
         metadata={
@@ -43,7 +43,7 @@ def delta_rs_metadata(context: AssetExecutionContext, github_api: GitHubAPIResou
 )
 def iceberg_python_metadata(context: AssetExecutionContext, github_api: GitHubAPIResource) -> dict[str, Any]:
     """Metadata from the GitHub repository of the Iceberg Python client."""
-    repo_metadata = github_api.get_repository(owner='apache', repo='iceberg-python')
+    repo_metadata = github_api.get_metadata(owner='apache', repo='iceberg-python')
 
     context.add_output_metadata(
         metadata={
@@ -64,7 +64,7 @@ def iceberg_python_metadata(context: AssetExecutionContext, github_api: GitHubAP
 )
 def hudi_rs_metadata(context: AssetExecutionContext, github_api: GitHubAPIResource) -> dict[str, Any]:
     """Metadata from the GitHub repository of the Hudi Python client."""
-    repo_metadata = github_api.get_repository(owner='apache', repo='hud-rs')
+    repo_metadata = github_api.get_metadata(owner='apache', repo='hudi-rs')
 
     context.add_output_metadata(
         metadata={

@@ -46,13 +46,13 @@ def extract_metadata(repo_matadata: dict[str, Any]) -> dict[str, Any]:
         'stars': repo_matadata.get('stargazers_count'),
         'forks': repo_matadata.get('forks_count'),
         'watchers': repo_matadata.get('subscribers_count'),
-        'releases': None,
+        'releases': repo_matadata.get('release_count'),
         'open issues': repo_matadata.get('open_issues_count'),
-        'closed issues': None, # no idea yet, have to research
-        'avg days until issue was closed': None, # well, I give up
-        'open PRs': None,
-        'closed PRs': None,
-        'avg days until PR was closed': None,
+        'closed issues': repo_matadata.get('closed_issues_count'),
+        'avg days until issue was closed': repo_matadata.get('avg_days_until_issue_was_closed'),
+        'open PRs': repo_matadata.get('open_pr_count'),
+        'closed PRs': repo_matadata.get('closed_pr_count'),
+        'avg days until PR was closed': repo_matadata.get('avg_days_until_pr_was_closed'),
     }
 
     return extracted_data

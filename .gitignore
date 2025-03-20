@@ -166,3 +166,7 @@ cython_debug/
 # Data
 /output_data
 /files
+
+
+test.py
+test.ipynb
