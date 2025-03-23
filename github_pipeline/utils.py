@@ -47,11 +47,11 @@ def extract_metadata(repo_matadata: dict[str, Any]) -> dict[str, Any]:
         'forks': repo_matadata.get('forks_count'),
         'watchers': repo_matadata.get('subscribers_count'),
         'releases': repo_matadata.get('release_count'),
-        'open issues': repo_matadata.get('open_issues_count'),
-        'closed issues': repo_matadata.get('closed_issues_count'),
-        'avg days until issue was closed': repo_matadata.get('avg_days_until_issue_was_closed'),
-        'open PRs': repo_matadata.get('open_pr_count'),
-        'closed PRs': repo_matadata.get('closed_pr_count'),
+        'open issues': repo_matadata.get('open_issues'),
+        'closed issues': repo_matadata.get('closed_issues'),
+        'avg days until issue was closed': repo_matadata.get('average_issue_duration'),
+        'open PRs': repo_matadata.get('open_prs'),
+        'closed PRs': repo_matadata.get('closed_prs'),
         'avg days until PR was closed': repo_matadata.get('avg_days_until_pr_was_closed'),
     }
 
