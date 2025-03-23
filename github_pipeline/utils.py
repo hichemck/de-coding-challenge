@@ -52,7 +52,7 @@ def extract_metadata(repo_matadata: dict[str, Any]) -> dict[str, Any]:
         'avg days until issue was closed': repo_matadata.get('average_issue_duration'),
         'open PRs': repo_matadata.get('open_prs'),
         'closed PRs': repo_matadata.get('closed_prs'),
-        'avg days until PR was closed': repo_matadata.get('average_pr_duration'),
+        'avg days until PR was closed': repo_matadata.get('avg_days_until_pr_was_closed'),
     }
 
     return extracted_data

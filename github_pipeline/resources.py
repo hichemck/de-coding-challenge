@@ -79,10 +79,12 @@ class GitHubAPIResource(ConfigurableResource):
         return response
 
     def get_metadata(self, owner: str, repo: str) -> dict[str, Any]:
-        """Get consolidated metadata about a GitHub repository using main endpoint handler
-        and items handler for releases, issues, and PRs. The meatadta
-        dictionary is initialized by the main endpoint handler and extended
-        with the additional information from the items handler.
+        """Get consolidated metadata about a GitHub repository using
+        main endpoint handler, releases handler, and issues handler.
+        Releases handler and issues handler use a generic method that
+        uses pagination to get all items as a flattened list.
+        Metadata is initialized with the main endpoint handler output and
+        extended with the results of the releases and issues handlers.
         Args:
             - owner (str): \
                 The account owner of the repository.
@@ -99,37 +101,20 @@ class GitHubAPIResource(ConfigurableResource):
         metadata = self.handle_main_repo_endpoint(owner=owner, repo=repo)
 
         # handle releases
-        release_count = self.handle_repo_item(owner=owner,
-                                              repo=repo,
-                                              suffix='releases')
+        release_count = self.handle_releases(owner=owner,
+                                             repo=repo)
         metadata['release_count'] = release_count
 
-        # handle closed issues
-        closed_issues_count, avg_days_until_issue_was_closed = \
-            self.handle_repo_item(owner=owner,
-                                  repo=repo,
-                                  suffix='issues?state=closed',
-                                  calculate_duration=True)
-        metadata['closed_issues_count'] = closed_issues_count
-        metadata['avg_days_until_issue_was_closed'] = \
-            avg_days_until_issue_was_closed
-
-        # handle open prs
-        open_pr_count = \
-            self.handle_repo_item(owner=owner,
-                                  repo=repo,
-                                  suffix='pulls?state=open')
-        metadata['open_pr_count'] = open_pr_count
-
-        # handle closed prs
-        closed_pr_count, avg_days_until_pr_was_closed = \
-            self.handle_repo_item(owner=owner,
-                                  repo=repo,
-                                  suffix='pulls?state=closed',
-                                  calculate_duration=True)
-        metadata['closed_pr_count'] = closed_pr_count
-        metadata['avg_days_until_pr_was_closed'] = \
-            avg_days_until_pr_was_closed
+        # handle issues (which contain PRs)
+        (open_issues, closed_issues, open_prs, closed_prs,
+            average_issue_duration, average_pr_duration) = \
+            self.handle_issues(owner=owner, repo=repo)
+        metadata['open_issues'] = open_issues
+        metadata['closed_issues'] = closed_issues
+        metadata['open_prs'] = open_prs
+        metadata['closed_prs'] = closed_prs
+        metadata['average_issue_duration'] = average_issue_duration
+        metadata['average_pr_duration'] = average_pr_duration
 
         return metadata
 
@@ -155,40 +140,33 @@ class GitHubAPIResource(ConfigurableResource):
         payload = response.json()
         return payload
 
-    def handle_repo_item(self, owner: str, repo: str, suffix: str,
-                         calculate_duration=False) \
-            -> Union[int, Tuple[int, float]]:
-        """Get the count of items (releases, closed issues, etc.) of a GitHub
+    def handle_repo_item(self, owner: str, repo: str,
+                         suffix: str) \
+            -> list[dict[str, Any]]:
+        """Get the items (releases, issues, etc.) of a GitHub
         repository using pagination. A while loop is used to iterate over
-        the pages until the last page is reached.
+        the pages until the last page is reached. The flattened list of items
+        is returned.
         Docs:
         https://docs.github.com/en/rest/releases/releases?apiVersion=2022-11-28
         https://docs.github.com/en/rest/issues?apiVersion=2022-11-28
-        https://docs.github.com/en/rest/pulls?apiVersion=2022-11-28
 
         Args:
-            - owner (str): The account owner of the repository.
-                Case insensitive.
-            - repo (str): The name of the repository without the .git
-                extension. Case insensitive.
-            - suffix (str): The API endpoint suffix
-                (e.g., 'releases' for releases count,
-                'issues?state=closed' for closed issues count,
-                'suffix='pulls?state=open' for open pull requests count,
-                'suffix='pulls?state=closed' for closed pull requests count).      
-            - calculate_duration (bool): If True, calculates the average
-                duration in days for closed issues/pull requests.
+            - owner (str): \
+                The account owner of the repository.
+                The name is not case sensitive.
+            - repo (str): \
+                The name of the repository without the `.git` extension.
+                The name is not case sensitive.
 
         Returns:
-            - int: Number of items counted (releases, closed issues, closed pull requests, ...)
-            - float: Average duration in days for closed issues/pull requests
-                if calculate_duration is True.
+            - list[dict[str, Any]]: \
+                Flattened list of items from all pages.
         """
+
         # initialize variables
         path = f'/repos/{owner}/{repo}/{suffix}'
-        count = 0
-        total_duration = 0
-
+        nested_list = []
         while True:
             # execute request
             response = self.execute_request(method='GET', path=path)
@@ -196,14 +174,7 @@ class GitHubAPIResource(ConfigurableResource):
 
             if not items:
                 break
-
-            count += len(items)
-
-            if calculate_duration:
-                for item in items:
-                    created_at = datetime.strptime(item["created_at"], "%Y-%m-%dT%H:%M:%SZ")
-                    closed_at = datetime.strptime(item["closed_at"], "%Y-%m-%dT%H:%M:%SZ")
-                    total_duration += (closed_at - created_at).days
+            nested_list.append(items)
 
             # check if there is a next page
             link_attr = response.headers.get('Link')
@@ -217,6 +188,76 @@ class GitHubAPIResource(ConfigurableResource):
 
             path = match.group(1)  # update path for next iteration
 
-        average_duration = total_duration / count if count > 0 else 0
+        flattened_list = [item for sublist in nested_list for item in sublist]
+        return flattened_list
 
-        return (count, average_duration) if calculate_duration else count
+    def handle_releases(self, owner: str, repo: str) -> int:
+        """Get the count of releases of a GitHub repository
+        using the generic method `handle_repo_item`.
+        Length of the list of releases is returned.
+        Docs:
+        https://docs.github.com/en/rest/repos/releases?apiVersion=2022-11-28
+
+        Args:
+            - owner (str): \
+                The account owner of the repository.
+                The name is not case sensitive.
+            - repo (str): \
+                The name of the repository without the `.git` extension.
+                The name is not case sensitive.
+        Returns:
+            - int: Number of releases counted.
+
+        """
+        releases = self.handle_repo_item(owner=owner, repo=repo,
+                                         suffix='releases')
+        return len(releases)
+
+    def handle_issues(self, owner: str, repo: str) \
+            -> Tuple[int, int, int, int, float, float]:
+        """Get the count of open and closed issues and pull requests
+        and the average duration for closed issues and pull requests of
+        a GitHub repository using the generic method `handle_repo_item`.
+        Afterward, the method iterates over all issues
+        and calculates counts and durations.
+        'state=all' needs to be used to get all issues,
+        otherwise only open issues are returned.
+        Docs:
+        https://docs.github.com/en/rest/issues?apiVersion=2022-11-28
+        """
+        # get all issues
+        issues = self.handle_repo_item(owner=owner, repo=repo,
+                                       suffix='issues?state=all')
+        # initialize variables
+        open_issues = 0
+        closed_issues = 0
+        open_prs = 0
+        closed_prs = 0
+        issues_duration = 0
+        prs_duration = 0
+
+        # iterate over issues
+        for issue in issues:
+            if issue['state'] == 'open':  # open issue / pr
+                if 'pull_request' in issue.keys():  # open pull request
+                    open_prs += 1
+                else:  # open issue
+                    open_issues += 1
+            elif issue['state'] == 'closed':  # closed issue / pr
+                if 'pull_request' in issue.keys():  # closed pull request
+                    closed_prs += 1
+                    created_at = datetime.strptime(issue['created_at'], '%Y-%m-%dT%H:%M:%SZ')
+                    closed_at = datetime.strptime(issue['closed_at'], '%Y-%m-%dT%H:%M:%SZ')
+                    prs_duration += (closed_at - created_at).days
+                else:  # closed issue
+                    closed_issues += 1
+                    created_at = datetime.strptime(issue['created_at'], '%Y-%m-%dT%H:%M:%SZ')
+                    closed_at = datetime.strptime(issue['closed_at'], '%Y-%m-%dT%H:%M:%SZ')
+                    issues_duration += (closed_at - created_at).days
+
+        average_pr_duration = \
+            prs_duration / closed_prs if closed_prs > 0 else 0
+        average_issue_duration = \
+            issues_duration / closed_issues if closed_issues > 0 else 0
+        return (open_issues, closed_issues, open_prs, closed_prs,
+                average_issue_duration, average_pr_duration)
