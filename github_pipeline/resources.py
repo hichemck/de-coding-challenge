@@ -105,7 +105,7 @@ class GitHubAPIResource(ConfigurableResource):
                                              repo=repo)
         metadata['release_count'] = release_count
 
-        # handle issues (which contain PRs)
+        # handle issues (which contain issues and PRs)
         (open_issues, closed_issues, open_prs, closed_prs,
             average_issue_duration, average_pr_duration) = \
             self.handle_issues(owner=owner, repo=repo)
